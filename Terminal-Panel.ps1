@@ -42,7 +42,7 @@ try {
         # 0-12s: grid. 12-20s: cascade. 20-28s: main stage. 28-32s: return.
         if ($cycle -ge 12 -and $cycle -lt 20) {
             $blend = [Math]::Min(1, ($cycle - 12) / 1.3)
-            $target = @(0.07 + $Index * 0.085, 0.06 + $Index * 0.085, 0.43, 0.39)
+            $target = @((0.07 + $Index * 0.085), (0.06 + $Index * 0.085), 0.43, 0.39)
         } elseif ($cycle -ge 20 -and $cycle -lt 28) {
             $blend = [Math]::Min(1, ($cycle - 20) / 1.1)
             $target = $grid[$Index].Clone()
