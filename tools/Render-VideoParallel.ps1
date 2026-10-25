@@ -53,7 +53,7 @@ try {
     [IO.File]::WriteAllText($list,$lines,(New-Object Text.UTF8Encoding($false)))
     $temporary=Join-Path $settings.Directory 'final.mp4'
     $ErrorActionPreference='Continue'
-    & $settings.Ffmpeg -hide_banner -loglevel warning -y -f concat -safe 0 -i $list -ss $settings.Start -i $playback.Audio -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -ar 48000 -movflags +faststart -shortest $temporary 2>&1|Out-File -LiteralPath (Join-Path $settings.Directory 'mux.log') -Encoding UTF8
+    & $settings.Ffmpeg -hide_banner -loglevel warning -y -f concat -safe 0 -i $list -ss $settings.Start -t $duration -i $playback.Audio -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -ar 48000 -movflags +faststart $temporary 2>&1|Out-File -LiteralPath (Join-Path $settings.Directory 'mux.log') -Encoding UTF8
     $ErrorActionPreference='Stop'
     if($LASTEXITCODE -ne 0){throw 'Video assembly failed; see mux.log'}
     New-Item -ItemType Directory -Path (Split-Path $settings.Output -Parent) -Force|Out-Null

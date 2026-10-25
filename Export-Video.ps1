@@ -27,7 +27,7 @@ Copy-Item -LiteralPath $playback -Destination (Join-Path $directory 'playback.js
 $encoder='h264_nvenc'
 if(-not $Stills) {
     $ErrorActionPreference='Continue'
-    & $current.Ffmpeg -hide_banner -loglevel error -f lavfi -i 'color=s=64x64:d=0.1' -c:v h264_nvenc -f null - 2>&1|Out-File (Join-Path $directory 'encoder-probe.log') -Encoding UTF8
+    & $current.Ffmpeg -hide_banner -loglevel error -f lavfi -i 'color=s=256x256:d=0.1' -c:v h264_nvenc -f null - 2>&1|Out-File (Join-Path $directory 'encoder-probe.log') -Encoding UTF8
     $ErrorActionPreference='Stop'
     if($LASTEXITCODE -ne 0){$encoder='libx264'}
 }

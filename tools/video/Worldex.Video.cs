@@ -181,9 +181,9 @@ namespace Worldex.Video {
                     string video=job.Encoder=="h264_nvenc"?"-c:v h264_nvenc -preset p5 -rc vbr -cq 19 -b:v 0":"-c:v libx264 -preset fast -crf 18 -threads 4";
                     string temporary=Path.Combine(job.Directory,"rendering.mp4");
                     var start=new ProcessStartInfo(job.Ffmpeg);
-                    string audio=job.VideoOnly?"":" -ss "+job.Start.ToString(System.Globalization.CultureInfo.InvariantCulture)+" -i \""+renderer.settings.Audio+"\"";
+                    string audio=job.VideoOnly?"":" -ss "+job.Start.ToString(System.Globalization.CultureInfo.InvariantCulture)+" -t "+duration.ToString(System.Globalization.CultureInfo.InvariantCulture)+" -i \""+renderer.settings.Audio+"\"";
                     string audioCodec=job.VideoOnly?" -an":" -c:a aac -b:a 192k -ar 48000";
-                    start.Arguments="-hide_banner -loglevel warning -y -f rawvideo -pixel_format bgra -video_size "+job.Width+"x"+job.Height+" -framerate "+job.Fps+" -i pipe:0"+audio+" "+video+" -pix_fmt yuv420p"+audioCodec+" -movflags +faststart -shortest \""+temporary+"\"";
+                    start.Arguments="-hide_banner -loglevel warning -y -f rawvideo -pixel_format bgra -video_size "+job.Width+"x"+job.Height+" -framerate "+job.Fps+" -i pipe:0"+audio+" "+video+" -pix_fmt yuv420p"+audioCodec+" -movflags +faststart \""+temporary+"\"";
                     start.UseShellExecute=false;start.CreateNoWindow=true;start.RedirectStandardInput=true;start.RedirectStandardError=true;
                     using(var encoder=new Process()) {
                         encoder.StartInfo=start;
