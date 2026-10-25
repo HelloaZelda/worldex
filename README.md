@@ -54,6 +54,12 @@ Windows PowerShell 5.1、Python、FFmpeg。Python 依赖：`python -m pip instal
 
 首次会下载参考歌词 JSON；不上传音频。后续直接使用 `.runtime/` 缓存。歌曲、歌词缓存、模型实验缓存、解码音频、日志与图片均不提交 Git。当前编排针对约 212 秒的 Mili 原版录音。
 
+## 公开仓库与本地文件
+
+仓库仅提供程序、编排与说明，不包含歌曲、成片或完整歌词文件。请自行准备本地音频；音乐与歌词权利归原权利人所有。
+
+音频路径、工具路径和运行状态保存在被 Git 忽略的 `.runtime/` 中；视频保存在被忽略的 `exports/` 中。不要将这些目录、个人配置或凭据打包上传。问题反馈中的错误日志可能含本机路径，分享前请先遮去用户名与其他个人信息。
+
 ## 维护与验证
 
 `src/Worldex.Formations.cs` 定义窗口符号，`src/Worldex.Performance.cs` 绘制内容，`tools/build_performance.py` 编译歌词动作，`assets/design-tokens.json` 管理颜色字体。`.runtime/cache/<音频哈希>/` 包含可检查的歌词、节奏和生成时间线。
