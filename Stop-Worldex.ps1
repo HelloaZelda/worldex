@@ -1,8 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $runtime = Join-Path $PSScriptRoot '.runtime'
 if (Test-Path -LiteralPath $runtime) {
-    # Workers check this marker every frame, then close their own console.
-    Get-ChildItem -LiteralPath $runtime -Filter '*.stop' | Remove-Item -Force
+    # Keep previous markers: an older detached preparation may still be exiting.
     $config = Join-Path $runtime 'run.json'
     if (Test-Path -LiteralPath $config) {
         $run = Get-Content -LiteralPath $config -Raw -Encoding UTF8 | ConvertFrom-Json

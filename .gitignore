@@ -7,4 +7,9 @@ __pycache__/
 dist/
 build/
 *.log
+*.wav
+*.flac
+*.mp3
+*.dll
+*.pdb
 .runtime/
