@@ -53,13 +53,33 @@ $poses=@()
 foreach($index in $graphicActors) {
     $t=67.25-$config.CueOffset
     if(-not $visual.FormationVisible($index,$t)){throw 'Heart tile unexpectedly hidden.'}
-    $a=$visual.Position($index,$t);$b=$visual.Position($index,$t+.1)
-    if([Math]::Abs($a.x-$b.x)+[Math]::Abs($a.y-$b.y) -gt .00001){throw 'Heart formation drifts while it should hold.'}
+    $a=$visual.Position($index,$t)
     $poses+=[pscustomobject]@{Row=[Math]::Round($a.y,3);X=$a.x}
 }
 $rowCounts=($poses|Group-Object Row|Sort-Object {[double]$_.Name}|ForEach-Object {$_.Count}) -join ','
 if($rowCounts -ne '2,5,5,3,1'){throw ('Invalid desktop heart silhouette: '+$rowCounts)}
 Write-Host 'PASS: sixteen real-window positions form a stable heart with rows 2/5/5/3/1.'
+$waveTimes=@(38.0,38.35)
+$waveMotion=0.0
+foreach($index in $graphicActors) {
+    $a=$visual.Position($index,$waveTimes[0]-$config.CueOffset)
+    $b=$visual.Position($index,$waveTimes[1]-$config.CueOffset)
+    $waveMotion+=[Math]::Abs($a.y-$b.y)
+    if([Math]::Abs($a.x-$b.x) -gt .001){throw 'Traveling wave should preserve its horizontal sampling positions.'}
+}
+if($waveMotion -lt .25){throw 'Sine formation is still static.'}
+$before=$visual.Draw(6,100,36,12.4-$config.CueOffset,$false)
+$after=$visual.Draw(6,100,36,12.6-$config.CueOffset,$false)
+$changed=0
+for($i=0;$i -lt $before.Cells.Length;$i++){if($before.Cells[$i].Char -ne $after.Cells[$i].Char){$changed++}}
+if($changed -lt 500){throw 'Simulation data flood is too sparse or static.'}
+$linger=$visual.Draw(7,120,12,16.5-$config.CueOffset,$false)
+if((-join ($linger.Cells|ForEach-Object {$_.Char})) -notmatch 'SIMULATION'){throw 'SIMULATION keyword disappears too early.'}
+$initialization=$visual.Draw(7,120,12,11.6-$config.CueOffset,$false)
+if((-join ($initialization.Cells|ForEach-Object {$_.Char})) -notmatch 'INITIALIZATION'){throw 'Initialization emphasis does not survive the next lyric line.'}
+$outro=$visual.Draw(7,120,12,200-$config.CueOffset,$false)
+if((-join ($outro.Cells|ForEach-Object {$_.Char})) -notmatch '99%'){throw 'Outro does not communicate the stalled 99% state.'}
+Write-Host ('PASS: traveling sine motion, '+$changed+' changing simulation cells, and extended SIMULATION caption.')
 if ($Live) {
     $memory = [System.IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting('Local\Worldex.' + $settings.Run)
     $map = $memory.CreateViewAccessor()

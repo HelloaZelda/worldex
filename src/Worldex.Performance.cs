@@ -36,9 +36,21 @@ namespace Worldex {
         }
         Canvas DrawLyrics(int width,int height,double time,bool paused) {
             var c=new Canvas(width,height);int n=LineAt(time+Config.CueOffset);var line=Lyrics.lines[n];
-            bool active=time+Config.CueOffset>=line.start-.08&&time+Config.CueOffset<=line.end+.15;
+            bool keyword=line.text.Length>1&&line.text==line.text.ToUpper();
+            bool active=time+Config.CueOffset>=line.start-.08&&time+Config.CueOffset<=line.end+(keyword?1.15:.25);
             c.Text(1,0,"LYRICS / "+TimeSpan.FromSeconds(time).ToString(@"mm\:ss\.ff")+(paused?" / PAUSED":""),3);
-            if(!active) {c.Center(Math.Max(1,height/2),"[ INSTRUMENTAL / WINDOW CHOREOGRAPHY ]",1);return c;}
+            if(height>5)for(int previous=n;previous>=Math.Max(0,n-6);previous--) {
+                var emphasis=Lyrics.lines[previous];double local=time+Config.CueOffset;
+                if(emphasis.text.Length>1&&emphasis.text==emphasis.text.ToUpper()&&local>=emphasis.start&&local<=emphasis.end+1.5&&local-emphasis.start<3.5) {
+                    if(emphasis.text!=line.text||!active)c.Center(1,"[ "+emphasis.text+" ]",emphasis.text.Contains("EXECUTION")?4:5);
+                    break;
+                }
+            }
+            if(!active) {
+                var interlude=Scenes[SceneAt(time)];
+                string message=interlude.kind=="stall"?"[ FINALIZING / 99% / WAITING FOR RETURN ]":interlude.kind=="storm"?"[ RECURSION / STACK OVERFLOW ]":"[ INSTRUMENTAL / WINDOW CHOREOGRAPHY ]";
+                c.Center(Math.Max(1,height/2),message,interlude.kind=="stall"?4:1);return c;
+            }
             var rows=new List<List<SungWord>>();var current=new List<SungWord>();int length=0;
             foreach(var word in line.words){if(length+word.text.Length+1>width-4&&current.Count>0){rows.Add(current);current=new List<SungWord>();length=0;}current.Add(word);length+=word.text.Length+1;}
             if(current.Count>0)rows.Add(current);
@@ -104,6 +116,7 @@ namespace Worldex {
             double radius=Math.Min(c.W*.39,(c.H-3)*.86),p=Math.Min(1,age/.6);
             // A fine, moving registration grid behind the image.
             for(int y=2;y<c.H-1;y+=4)for(int x=2;x<c.W-2;x+=8)c.Put(x,y,'·',1);
+            if(kind=="world"||kind=="data"||kind=="stream"||kind=="storm"||kind=="title")DataRain(c,t,accent,kind=="world"?.65:1.0);
             if(index==6&&c.W>=80) {
                 // Diagnostic gutters frame the central image rather than leaving
                 // the rest of the terminal as an empty presentation slide.
@@ -174,7 +187,8 @@ namespace Worldex {
                     for(int k=0;k<16;k++){int x=2+k*(c.W-4)/16,h=(int)(Data.At(t,k+4)*(c.H-4));for(int y=0;y<h;y++)for(int dx=0;dx<Math.Max(1,(c.W-4)/16-1);dx++)c.Put(x+dx,c.H-2-y,y%3==0?'─':'█',y>c.H*.6?6:accent);}break;
                 default:Cloud(c,t,radius,accent,0);break;
             }
-            if(index==6&&!String.IsNullOrEmpty(scene.focus)&&scene.focus.Length<22&&kind!="countdown"&&kind!="execute"&&kind!="final"&&age<.28) {
+            double titleHold=Math.Min(2.2,Math.Max(1.1,scene.end-scene.time));
+            if(index==6&&!String.IsNullOrEmpty(scene.focus)&&scene.focus.Length<22&&kind!="countdown"&&kind!="execute"&&kind!="final"&&age<titleHold) {
                 for(int y=Math.Max(1,c.H/2-3);y<Math.Min(c.H-1,c.H/2+3);y++)ClearRow(c,y);
                 c.Big(scene.focus.Replace(" ",""),c.H/2-2,6,1);
             }
@@ -367,10 +381,24 @@ namespace Worldex {
         }
         static void DataStream(Canvas c,double t,double age,int color,bool fill) {
             for(int y=1;y<c.H-1;y++) {
-                int offset=(int)(t*17)+y*7919;string row="";
+                int sequence=(int)(t*24)+y,offset=sequence*7919;
+                string[] commands={"WRITE","ALLOC","LINK ","COPY ","EXEC ","SYNC "};
+                string row=sequence.ToString("X6")+" "+commands[sequence%commands.Length]+" ";
                 for(int x=0;x<c.W/5+1;x++)row+=((offset+x*131)&65535).ToString("X4")+" ";
                 int visible=fill?(int)(Math.Min(1,age*.6)*(c.W-2)):c.W-2;
-                c.Text(1,y,row.Substring(0,Math.Min(row.Length,Math.Max(0,visible))),y%5==0?color:1);
+                c.Text(1,y,row.Substring(0,Math.Min(row.Length,Math.Max(0,visible))),sequence%6==0?6:sequence%3==0?3:color);
+            }
+        }
+        static void DataRain(Canvas c,double time,int color,double density) {
+            const string symbols="01ABCDEF{}[]<>/|";int scroll=(int)(time*22);
+            for(int x=1;x<c.W-1;x++) {
+                if(Noise(x*17)>density)continue;
+                int head=(scroll+x*11)%Math.Max(1,c.H);
+                for(int y=1;y<c.H-1;y++) {
+                    int tail=(head-y+c.H)%Math.Max(1,c.H);if(tail>c.H*.78)continue;
+                    char glyph=symbols[(x*13+(y+scroll)*7)%symbols.Length];
+                    c.Put(x,y,glyph,tail==0?6:tail<3?color:1);
+                }
             }
         }
     }

@@ -67,8 +67,35 @@ try {
     $count=@($score.scenes|Where-Object kind -eq 'countdown')[0]
     Set-Time ($count.time+.30)
     & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\count-native.png') | Out-File $log -Append -Encoding UTF8
+    Set-Time 38.0
+    & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\sine-a-native.png') | Out-File $log -Append -Encoding UTF8
+    $waveStart=@{}
+    foreach($file in $actors) {
+        $actor=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8|ConvertFrom-Json
+        if($actor.Index -in @(7,8)){continue}
+        $rect=New-Object WorldexCapture+Rect;[WorldexCapture]::GetWindowRect([IntPtr]$actor.Handle,[ref]$rect)|Out-Null
+        $waveStart[$actor.Index]=@{x=$rect.L;y=$rect.T}
+    }
+    Send-Command 1;Start-Sleep -Milliseconds 400;Send-Command 1;Start-Sleep -Milliseconds 500
+    & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\sine-b-native.png') | Out-File $log -Append -Encoding UTF8
+    $wavePixels=0
+    foreach($file in $actors) {
+        $actor=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8|ConvertFrom-Json
+        if($actor.Index -in @(7,8)){continue}
+        $rect=New-Object WorldexCapture+Rect;[WorldexCapture]::GetWindowRect([IntPtr]$actor.Handle,[ref]$rect)|Out-Null
+        $old=$waveStart[$actor.Index]
+        if([Math]::Abs($rect.L-$old.x) -gt 2){throw 'Native traveling wave lost its fixed sampling columns.'}
+        $wavePixels+=[Math]::Abs($rect.T-$old.y)
+    }
+    if($wavePixels -lt 100){throw 'Native sine windows did not propagate.'}
+    Set-Time 14.6
+    & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\simulation-native.png') | Out-File $log -Append -Encoding UTF8
+    Set-Time 183.7
+    & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\network-collapse-native.png') | Out-File $log -Append -Encoding UTF8
+    Set-Time 200.0
+    & (Join-Path $PSScriptRoot 'Capture-Stage.ps1') -Output (Join-Path $root '.runtime\loading-native.png') | Out-File $log -Append -Encoding UTF8
     Set-Time 67.25
-    Save-Result 'passed' @{heartRows=$counts;actors=$positions.Count;captions=128;scenes=$score.scenes.Count;liveControls='passed';nativeStability='passed'}
+    Save-Result 'passed' @{heartRows=$counts;actors=$positions.Count;captions=128;scenes=$score.scenes.Count;liveControls='passed';nativeStability='passed';nativeWavePixels=$wavePixels;lateScenes='captured'}
 }catch {
     $_|Out-String|Out-File $log -Append -Encoding UTF8
     Save-Result 'error' ($_|Out-String)
