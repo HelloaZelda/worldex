@@ -1,8 +1,8 @@
 {
   "primitive": {
-    "ink":"#080c12", "slate":"#354655", "mint":"#75ebce", "ice":"#bfdeed", "paper":"#eef3ed", "coral":"#f76d7d", "gold":"#efc887",
-    "font":"Consolas", "cellWidth":8, "cellHeight":14, "fps":24
+    "ink":"#080c12", "slate":"#354655", "mint":"#75ebce", "ice":"#bfdeed", "paper":"#eef3ed", "coral":"#f76d7d", "gold":"#efc887", "heartTile":"#691931", "signalTile":"#0c3933",
+    "font":"Consolas", "cellWidth":8, "cellHeight":14, "fps":30
   },
-  "semantic": {"background":"ink", "quiet":"slate", "primary":"mint", "structure":"ice", "foreground":"paper", "conflict":"coral", "organic":"gold"},
+  "semantic": {"background":"ink", "quiet":"slate", "primary":"mint", "structure":"ice", "foreground":"paper", "conflict":"coral", "organic":"gold", "heartSurface":"heartTile", "signalSurface":"signalTile"},
   "component": {"graph":"primary", "wireframe":"structure", "largeType":"foreground", "fault":"conflict", "footer":"quiet"}
 }

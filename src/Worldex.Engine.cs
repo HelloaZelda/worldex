@@ -12,12 +12,13 @@ using System.Windows.Forms;
 
 namespace Worldex {
     public class Settings {
-        public string Root, Run, Audio, Features, Score, Tokens;
+        public string Root, Run, Audio, Features, Score, Tokens, Lyrics, Rhythm;
         public double Duration, Bpm, BeatOffset, Seek, CueOffset, Preview;
-        public bool Mute;
+        public bool Mute,Paused;
     }
-    public class Scene { public double time; public string kind, label, layout, code; }
-    public class Score { public Scene[] scenes; }
+    public class Scene { public double time,end; public string kind, label, layout, code, action, focus; public int lyric,variant; }
+    public class ActionCue { public double time,end,strength;public string name,word;public int actor,line; }
+    public class Score { public Scene[] scenes; public ActionCue[] actions; }
     public class Theme {
         public Dictionary<string,object> primitive;
         public Dictionary<string,string> semantic, component;
@@ -162,6 +163,9 @@ namespace Worldex {
             {'T',"11111/00100/00100/00100/00100"},{'M',"10001/11011/10101/10001/10001"},{'H',"10001/10001/11111/10001/10001"},
             {'A',"01110/10001/11111/10001/10001"},{'I',"11111/00100/00100/00100/11111"},{'N',"10001/11001/10101/10011/10001"},
             {'B',"11110/10001/11110/10001/11110"},{'Y',"10001/01010/00100/00100/00100"},{'F',"11111/10000/11110/10000/10000"},
+            {'G',"01111/10000/10111/10001/01110"},{'J',"00111/00010/00010/10010/01100"},{'K',"10001/10010/11100/10010/10001"},
+            {'P',"11110/10001/11110/10000/10000"},{'Q',"01110/10001/10101/10010/01101"},{'S',"01111/10000/01110/00001/11110"},
+            {'V',"10001/10001/10001/01010/00100"},{'Z',"11111/00010/00100/01000/11111"},
             {'6',"01110/10000/11110/10001/01110"},{'5',"11111/10000/11110/00001/11110"},{'4',"10010/10010/11111/00010/00010"},
             {'3',"11110/00001/01110/00001/11110"},{'2',"01110/10001/00110/01000/11111"},{'1',"00100/01100/00100/00100/01110"},
             {'0',"01110/10011/10101/11001/01110"},{'?',"01110/10001/00110/00000/00100"}
@@ -174,160 +178,23 @@ namespace Worldex {
             }
         }
     }
-    public class Visual {
+    public partial class Visual {
         public Settings Config;public Scene[] Scenes;public Features Data;public Theme Theme;
-        public Visual(Settings settings) { Config=settings;Scenes=Load<Score>(settings.Score).scenes;Data=new Features(settings.Features);Theme=Load<Theme>(settings.Tokens); }
+        public Visual(Settings settings) { Config=settings;Scenes=Load<Score>(settings.Score).scenes;Data=new Features(settings.Features);Theme=Load<Theme>(settings.Tokens);LoadPerformance(); }
         public static T Load<T>(string path) { return new JavaScriptSerializer().Deserialize<T>(File.ReadAllText(path)); }
         public int SceneAt(double time) { int i=0;while(i+1<Scenes.Length&&Scenes[i+1].time<=time+Config.CueOffset)i++;return i; }
-        public double Beat(double time) { return (time-Config.BeatOffset)*Config.Bpm/60; }
+        public double Beat(double time) { return RhythmPhase(time); }
         public static Box Layout(string name,int index,double t) {
-            if(index==6) {
-                if(name=="solo"||name=="heart")return new Box(.22,.16,.56,.67);
-                if(name=="execute")return new Box(.20,.25,.60,.50);
-                if(name=="split")return new Box(.29,.16,.42,.67);
-                return new Box(.285,.18,.43,.64);
-            }
-            int row=index/2;bool right=index%2==1;
-            if(name=="solo")return new Box(right?.84:.025,.12+row*.25,.135,.18);
-            if(name=="execute")return new Box(right?.68:.02,.035+row*.325,.30,.28);
-            if(name=="orbit") {
-                double angle=-Math.PI/2+index*Math.PI/3;
-                return new Box(.5+Math.Cos(angle)*.355-.112,.5+Math.Sin(angle)*.345-.12,.224,.24);
-            }
-            if(name=="heart")return new Box(right?.80:.02,.08+row*.285,.18,.23);
-            return new Box(right?.745:.018,.055+row*.30,.237,.265);
+            if(index==7)return new Box(.235,.795,.53,.18);
+            if(index==8)return new Box(.25,.018,.50,.115);
+            if(index==6)return new Box(.25,.17,.50,.60);
+            return new Box(index%2==1?.78:.02,.075+(index/2)*.245,.20,.22);
         }
         public Box Position(int index,double time) {
-            int s=SceneAt(time);Scene current=Scenes[s];Box to=Layout(current.layout,index,time);
-            Box from=Layout(s>0?Scenes[s-1].layout:current.layout,index,time);
-            double p=Math.Max(0,Math.Min(1,(time+Config.CueOffset-current.time)/.85));p=p*p*(3-2*p);
-            Box b=Box.Mix(from,to,p);
-            double pulse=Math.Exp(-(Beat(time)-Math.Floor(Beat(time)))*7)*.002;
-            if(current.layout!="solo") {b.x-=pulse*.5;b.w+=pulse;b.y-=pulse*.25;b.h+=pulse*.5;}
-            return b;
+            return FormationPosition(index,time);
         }
         public Color[] Palette {
-            get { var p=new Color[16];p[0]=Theme.Color("background");p[1]=Theme.Color("quiet");p[2]=Theme.Color("primary");p[3]=Theme.Color("structure");p[4]=Theme.Color("conflict");p[5]=Theme.Color("organic");p[6]=Theme.Color("foreground");for(int i=7;i<16;i++)p[i]=p[6];return p; }
-        }
-        public Canvas Draw(int index,int width,int height,double time,bool paused) {
-            var c=new Canvas(width,height);int sceneIndex=SceneAt(time);Scene scene=Scenes[sceneIndex];
-            double age=Math.Max(0,time+Config.CueOffset-scene.time),beat=Beat(time),pulse=Math.Exp(-(beat-Math.Floor(beat))*7),energy=Data.At(time,0);
-            bool conflict=scene.kind=="execute"||scene.kind=="error"||scene.kind=="storm"||scene.kind=="countdown";
-            int accent=conflict?4:scene.kind=="plant"||scene.kind=="fruit"||scene.kind=="cat"?5:2;
-            double radius=Math.Min(width*.36,height*.83)*(1+pulse*.07);
-            string[] titles={"OSC / SIGNAL","XYZ / GEOMETRY","PARTICLE / FIELD","MEM / FRAGMENTS","FFT / SPECTRUM","STATE / OBSERVER","W O R L D E X"};
-            c.Text(2,0,titles[index],3);c.Text(2,1,new string('─',Math.Max(0,width-4)),1);
-            string mode=scene.kind;
-            if(index!=6) {
-                if(scene.kind=="isolation"||scene.kind=="shutdown")mode="isolation";
-                else if(conflict && index%2==0)mode=scene.kind;
-                else if(index==0)mode="signal";
-                else if(index==1)mode=scene.kind=="circle"||scene.kind=="sine"||scene.kind=="infinity"?scene.kind:"cube";
-                else if(index==2)mode="points";
-                else if(index==3)mode=scene.kind=="fragments"?"fragments":"data";
-                else if(index==4)mode="spectrum";
-                else if(index==5)mode=scene.kind=="cat"?"cat":"eye";
-            }
-            switch(mode) {
-                case "power":
-                    for(int k=0;k<6;k++) {double y=4+k*(height-8)/6.0;double end=Math.Min(width-4,(age*.7-k*.12)*width);c.Line(3,y,end,y,'─',end>width*.7?2:1);if(end>4)c.Text((int)end-2,(int)y,"[+]",accent);}
-                    if(index==6)c.Big("BOOT",height/2-2,6,Math.Max(1,Math.Min(2,width/30)));break;
-                case "cube":case "cage":case "cageheart":
-                    Cube(c,time,radius,accent,mode=="cageheart"?1:0);
-                    if(mode=="cageheart")Heart(c,time,radius*.65,4,pulse);
-                    else if(mode=="cage")c.Center(height/2,"[ ENTITY / BOUND ]",6);
-                    break;
-                case "world":
-                    Globe(c,time,radius,accent);break;
-                case "points":
-                    for(int i=0;i<110;i++){double a=i*2.39996+time*.13,z=1-2*(i+.5)/110,rr=Math.Sqrt(1-z*z);c.Shape(Math.Cos(a)*rr*radius,z*radius*.43, i%9==0?'◆':'·',i%9==0?accent:1);}
-                    c.Line(width/2,height/2,width/2+radius,height/2,'─',3);c.Line(width/2,height/2,width/2,height/2-radius*.5,'│',3);break;
-                case "circle":
-                    for(int i=0;i<3;i++)c.Circle(0,0,radius*(.55+i*.17),.48,i==2?accent:1,'·');
-                    double a1=time*.9;double xx=width/2+radius*.89*Math.Cos(a1),yy=height/2+radius*.43*Math.Sin(a1);
-                    c.Line(width/2,height/2,xx,yy,'·',3);c.Text((int)xx,(int)yy,"●",6);c.Center(height-5,"x*x + y*y = r*r",3);break;
-                case "sine":case "signal":case "current":
-                    Wave(c,time,energy,pulse,accent,mode=="current");
-                    if(mode=="sine") {
-                        double px=c.W*(.5+.22*Math.Sin(time*.7)),phase=px/c.W*4*Math.PI-time*3;
-                        double amp=(c.H-9)*.34*(.35+energy*.65),py=c.H/2+Math.Sin(phase)*amp;
-                        double slope=Math.Cos(phase)*amp*4*Math.PI/c.W;
-                        c.Line(px-c.W*.15,py-slope*c.W*.15,px+c.W*.15,py+slope*c.W*.15,'·',5);
-                        c.Put((int)px,(int)py,'◆',6);c.Text((int)px+2,(int)py-1,"dy/dx",5);
-                    }
-                    break;
-                case "infinity":
-                    for(int j=0;j<3;j++)for(double a=0;a<6.29;a+=.025) {double k=1+Math.Sin(a)*Math.Sin(a);c.Shape(Math.Cos(a)/k*radius*(.7+j*.15),Math.Sin(a)*Math.Cos(a)/k*radius*.65,'·',j==2?accent:1);}
-                    c.Shape(Math.Cos(time)/ (1+Math.Sin(time)*Math.Sin(time))*radius,Math.Sin(time)*Math.Cos(time)/(1+Math.Sin(time)*Math.Sin(time))*radius*.65,'◆',6);break;
-                case "time":case "switch":
-                    c.Circle(0,0,radius*.8,.48,1,'·');
-                    for(int j=0;j<12;j++){double a=j*Math.PI/6;c.Shape(Math.Sin(a)*radius*.8,-Math.Cos(a)*radius*.384,'■',3);}
-                    c.Line(width/2,height/2,width/2+Math.Sin(time*.8)*radius*.65,height/2-Math.Cos(time*.8)*radius*.31,'·',accent);
-                    c.Center(height/2+3,mode=="switch"?(((int)beat%2==0)?"[ A ]  <==>  [ B ]":"[ B ]  <==>  [ A ]"):"BEFORE < 0 > AFTER",6);break;
-                case "resonance":
-                    for(int j=0;j<4;j++){double r=(time*5+j*radius/4)%radius;c.Circle(-radius*.32,0,r,.45,j%2==0?accent:1,'·');c.Circle(radius*.32,0,r,.45,j%2==0?3:1,'·');}
-                    c.Center(height/2,"A <────────> B",6);break;
-                case "plant":
-                    for(int k=0;k<10;k++){double y=height-6-k*(height-10)/10.0,x=width/2+Math.Sin(k*.4+time*.4)*2;c.Line(x,y,x,height-5,'│',2);double side=k%2==0?1:-1;for(double p=0;p<1;p+=.035)c.Shape(x-width/2+side*Math.Sin(p*Math.PI)*radius*.4, y-height/2-p*radius*.15,'·',5);}
-                    c.Center(height-5,"SEED -> CELL -> LIFE",3);break;
-                case "fruit":
-                    for(int k=0;k<6;k++)c.Circle(Math.Sin(k)*radius*.17,Math.Cos(k)*radius*.08,radius*.55,.5,k==5?4:1,'·');
-                    c.Text(width/2-3,(int)(height/2-radius*.29),"\\ | /",2);c.Center(height-5,"BIOLOGY / REPAIR",5);break;
-                case "cat":
-                    string[] cat={" /\\_____/\\ ","/           \\","|  o     o  |","|     ^     |"," \\  \\___/  / ","  `-------'  "};
-                    for(int j=0;j<cat.Length;j++)c.Center(height/2-3+j,cat[j],j==2?6:accent);
-                    c.Circle(0,0,radius*(.65+pulse*.15),.40,1,'·');c.Center(height-5,"purr(t) ~ sin(2*pi*f*t)",3);break;
-                case "eye":
-                    for(double a=0;a<6.29;a+=.025)c.Shape(Math.Cos(a)*radius,Math.Sin(a)*Math.Sin(a)*Math.Sign(Math.Sin(a))*radius*.30,'·',3);
-                    c.Circle(Math.Sin(time*.4)*radius*.16,0,radius*.24,.48,accent,'●');break;
-                case "data":case "fragments":
-                    for(int j=0;j<height-7;j++) {
-                        int n=(j*7919+(int)(time*9)*31+index*997)&65535;
-                        string text=String.Format("{0:X4}  {1:X4} {2:X4} {3:X4}  {4}",j*32,n,n^34817,n^1783,j%3==0?"ALLOC":"LINK ");
-                        int shift=mode=="fragments"?(int)(Math.Sin(j*19.7)*Math.Min(width,age*7)):0;
-                        if(mode!="fragments"||j%5>age*.1)c.Text(2+shift,3+j,text,j%5==0?accent:1);
-                    }break;
-                case "spectrum":
-                    for(int k=0;k<16;k++){int x=2+k*(width-4)/16;int hh=(int)(Data.At(time,k+4)*(height-8));for(int y=0;y<hh;y++)for(int dx=0;dx<Math.Max(1,(width-4)/16-1);dx++)c.Put(x+dx,height-5-y,y%3==0?'─':'█',y>height*.5?3:accent);}
-                    break;
-                case "execute":case "error":case "storm":case "countdown":
-                    for(int j=0;j<40;j++){double a=j*2.399+time*(mode=="storm"?.8:.25);double r=((j*.113+time*.30)%1)*radius;c.Shape(Math.Cos(a)*r,Math.Sin(a)*r*.5,j%3==0?'+':'·',1);}
-                    string word=mode=="error"?"ERROR":mode=="countdown"?Math.Max(1,6-(int)(age/.45)).ToString():mode=="storm"?"RECUR":"EXEC";
-                    int scale=index==6?Math.Max(1,Math.Min(2,(width-6)/(word.Length*6))):1;
-                    c.Big(word,height/2-(5*scale)/2,pulse>.35?6:4,scale);
-                    c.Center(height-5,mode=="error"?"[ INVALID WORLD STATE ]":"CALL / RETURN / CALL / RETURN",accent);break;
-                case "heart":
-                    Heart(c,time,radius,accent,pulse);if(index==6)c.Center(height-5,"(x*x + y*y - 1)^3 - x*x*y*y*y = 0",3);break;
-                case "isolation":
-                    if(index==6){c.Circle(0,0,radius*.25,.48,1,'·');c.Center(height/2,"ME",3);c.Center(height/2+3,"NO PEER FOUND",1);}
-                    else { c.Center(height/2,"- - -",1);c.Center(height/2+2,"DISCONNECTED",1); }break;
-                case "shutdown":
-                    if(age<1.2)c.Line(3,height/2,width-3,height/2,'─',3);
-                    else { c.Center(height/2,"PROCESS EXITED",3);c.Center(height/2+2,"[ 0 ]",1); }break;
-            }
-            // The upper and lower gutters remain legible over every graphic.
-            for(int x=0;x<width;x++) {c.Put(x,height-3,' ',1);c.Put(x,height-2,' ',1);c.Put(x,height-1,' ',1);}
-            c.Text(2,height-3,scene.code,accent);
-            string clock=TimeSpan.FromSeconds(Math.Max(0,time)).ToString(@"mm\:ss")+" / "+TimeSpan.FromSeconds(Config.Duration).ToString(@"mm\:ss");
-            c.Text(2,height-2,index==6?scene.label:clock+"  "+Config.Bpm.ToString("0.0")+" BPM",3);
-            if(index==6)c.Text(2,height-1,(paused?"PAUSED":"PLAYING")+"  SPACE pause | <- -> seek | ESC stop",1);
-            else {int fill=(int)((width-4)*Math.Min(1,Math.Max(0,time/Config.Duration)));c.Text(2,height-1,new string('━',fill),accent);}
-            return c;
-        }
-        static void Wave(Canvas c,double time,double energy,double pulse,int accent,bool current) {
-            c.Line(2,c.H/2,c.W-3,c.H/2,'─',1);
-            for(int j=2;j<c.W-2;j++) {
-                double a=(j/(double)c.W*4*Math.PI)-time*3;
-                double value=current&&((int)(time*2)%2==1)?Math.Sign(Math.Sin(a)):Math.Sin(a);
-                int y=(int)(c.H/2+value*(c.H-9)*.34*(.35+energy*.65));c.Put(j,y,'●',accent);
-                if(j%3==0)c.Put(j,(int)(c.H/2+Math.Sin(a*.5+1)*(c.H-9)*.20),'·',3);
-            }
-        }
-        static void Heart(Canvas c,double time,double radius,int color,double pulse) {
-            for(int layer=0;layer<3;layer++)for(double a=0;a<6.29;a+=.018) {
-                double s=(.75+layer*.12)*(1+pulse*.06),x=16*Math.Pow(Math.Sin(a),3)/18,y=-(13*Math.Cos(a)-5*Math.Cos(2*a)-2*Math.Cos(3*a)-Math.Cos(4*a))/18;
-                c.Shape(x*radius*s,y*radius*.46*s,layer==2?'●':'·',layer==2?color:1);
-            }
+            get { var p=new Color[16];p[0]=Theme.Color("background");p[1]=Theme.Color("quiet");p[2]=Theme.Color("primary");p[3]=Theme.Color("structure");p[4]=Theme.Color("conflict");p[5]=Theme.Color("organic");p[6]=Theme.Color("foreground");for(int i=7;i<16;i++)p[i]=p[6];p[8]=Theme.Color("heartSurface");p[9]=Theme.Color("signalSurface");return p; }
         }
         static void Globe(Canvas c,double time,double radius,int accent) {
             for(int j=0;j<10;j++)for(double a=0;a<6.29;a+=.035){double lat=(j/9.0-.5)*Math.PI,x=Math.Cos(lat)*Math.Cos(a+time*.22),z=Math.Cos(lat)*Math.Sin(a+time*.22);c.Shape(x*radius,Math.Sin(lat)*radius*.45,'·',z>0?accent:1);}
@@ -346,6 +213,7 @@ namespace Worldex {
         }
     }
     public static class Engine {
+        public const int PanelCount=18;
         static string Stop(Settings s) {return Path.Combine(s.Root,".runtime",s.Run+".stop");}
         static string Map(Settings s) {return "Local\\Worldex."+s.Run;}
         public static void Director(string configPath) {
@@ -356,10 +224,10 @@ namespace Worldex {
                     map.Write(0,-1.0);map.Write(24,DateTime.UtcNow.Ticks);
                     var wait=Stopwatch.StartNew();bool all=false;
                     while(wait.Elapsed.TotalSeconds<30&&!File.Exists(Stop(s))) {
-                        all=true;for(int i=0;i<7;i++)if(map.ReadInt32(64+i*4)!=1)all=false;
+                        all=true;for(int i=0;i<PanelCount;i++)if(map.ReadInt32(64+i*4)!=1)all=false;
                         map.Write(24,DateTime.UtcNow.Ticks);if(all)break;Thread.Sleep(30);
                     }
-                    if(!all)throw new TimeoutException("Seven terminal panels did not become ready. See panel logs.");
+                    if(!all)throw new TimeoutException("Eighteen terminal actors did not become ready. See panel logs.");
                     using(var backdrop=new Stage()) {
                         backdrop.FormBorderStyle=FormBorderStyle.None;backdrop.ShowInTaskbar=false;backdrop.StartPosition=FormStartPosition.Manual;backdrop.TopMost=true;
                         backdrop.Bounds=Screen.PrimaryScreen.WorkingArea;backdrop.BackColor=ColorTranslator.FromHtml("#080c12");backdrop.Text="Worldex / Stage";
@@ -367,21 +235,26 @@ namespace Worldex {
                         backdrop.Quit=()=>map.Write(8,1);
                         backdrop.Show();Native.SetWindowPos(backdrop.Handle,new IntPtr(-1),0,0,0,0,0x0013);
                         Application.DoEvents();
-                        for(int i=0;i<7;i++)Native.SetWindowPos(new IntPtr(map.ReadInt64(192+i*8)),new IntPtr(-1),0,0,0,0,0x0013);
+                        for(int i=0;i<PanelCount;i++)Native.SetWindowPos(new IntPtr(map.ReadInt64(512+i*8)),new IntPtr(-1),0,0,0,0,0x0013);
                         // Panels lift themselves above the stage only once it exists.
                         map.Write(32,1);
-                        audio.Seek(s.Seek);bool paused=false;var preview=Stopwatch.StartNew();double lastTime=s.Seek;var status=Stopwatch.StartNew();
+                        audio.Seek(s.Seek);bool paused=s.Paused;if(paused)audio.Pause(true);map.Write(12,paused?1:0);var preview=Stopwatch.StartNew();double lastTime=s.Seek;var status=Stopwatch.StartNew();var health=Stopwatch.StartNew();
                         while(!File.Exists(Stop(s))&&map.ReadInt32(8)==0) {
-                            if(preview.Elapsed.TotalSeconds>3) {
-                                bool lost=false;for(int i=0;i<7;i++)if((DateTime.UtcNow.Ticks-map.ReadInt64(128+i*8))/(double)TimeSpan.TicksPerSecond>3)lost=true;
+                            if(preview.Elapsed.TotalSeconds>3&&health.ElapsedMilliseconds>500) {
+                                health.Restart();
+                                bool lost=false;for(int i=0;i<PanelCount;i++) {
+                                    try{using(var process=Process.GetProcessById(map.ReadInt32(1024+i*4)))if(process.HasExited)lost=true;}
+                                    catch(ArgumentException){lost=true;}
+                                }
                                 if(lost)break;
                             }
                             int cmd=map.ReadInt32(16);if(cmd!=0)map.Write(16,0);
                             if(cmd==1){paused=!paused;audio.Pause(paused);map.Write(12,paused?1:0);}
                             if(cmd>=2&&cmd<=4){audio.Seek(cmd==4?0:Math.Max(0,Math.Min(s.Duration-.1,lastTime+(cmd==2?-10:10))));if(paused)audio.Pause(true);}
+                            if(cmd==5){audio.Seek(Math.Max(0,Math.Min(s.Duration-.1,map.ReadDouble(48))));if(paused)audio.Pause(true);}
                             lastTime=audio.Time;map.Write(0,lastTime);map.Write(24,DateTime.UtcNow.Ticks);
                             if(status.ElapsedMilliseconds>500) {
-                                File.WriteAllText(Path.Combine(s.Root,".runtime",s.Run+"-playback.json"),new JavaScriptSerializer().Serialize(new { time=lastTime, paused=paused, ready=7, clock="waveOut device position" }));status.Restart();
+                                File.WriteAllText(Path.Combine(s.Root,".runtime",s.Run+"-playback.json"),new JavaScriptSerializer().Serialize(new { time=lastTime, paused=paused, ready=PanelCount, clock="waveOut device position" }));status.Restart();
                             }
                             if(lastTime>=s.Duration-.04||(s.Preview>0&&preview.Elapsed.TotalSeconds>=s.Preview))break;
                             Application.DoEvents();Thread.Sleep(10);
@@ -396,13 +269,14 @@ namespace Worldex {
             var s=Visual.Load<Settings>(configPath);string metadata=Path.Combine(s.Root,".runtime",s.Run+"-"+index+".json");
             try {
                 var visual=new Visual(s);IntPtr window=Native.GetConsoleWindow(),output=Native.GetStdHandle(-11);
+                Native.ShowWindow(window,0);
                 Native.SetConsoleCP(65001);Native.SetConsoleOutputCP(65001);
-                Console.Title="WORLDEX / "+(index==6?"MAIN STAGE":(index%2==0?"PowerShell":"CMD")+" / "+(index+1));
+                Console.Title="WORLDEX / "+(index==6?"MAIN STAGE":index==7?"LYRICS / LIVE":index==8?"PERCUSSION / LIVE":(index%2==0?"PowerShell":"CMD")+" / "+(index+1));
                 Console.CursorVisible=false;
                 uint mode;IntPtr input=Native.GetStdHandle(-10);if(Native.GetConsoleMode(input,out mode))Native.SetConsoleMode(input,(mode|0x80u)&~0x40u);
                 double dpi=Native.GetDpiForWindow(window)/96.0;
                 // Console font coordinates are logical; conhost applies monitor DPI.
-                var font=new Native.FontInfo();font.Size=(uint)Marshal.SizeOf(typeof(Native.FontInfo));font.Cell=new Native.Coord(0,visual.Theme.Number("cellHeight"));font.Face=visual.Theme.Font;font.Weight=400;font.Family=54;
+                var font=new Native.FontInfo();font.Size=(uint)Marshal.SizeOf(typeof(Native.FontInfo));font.Cell=new Native.Coord(0,index==7?19:11);font.Face=visual.Theme.Font;font.Weight=400;font.Family=54;
                 if(!Native.SetCurrentConsoleFontEx(output,false,ref font))throw new IOException("Unable to set console font");
                 var palette=new Native.BufferInfo();palette.Size=(uint)Marshal.SizeOf(typeof(Native.BufferInfo));palette.Colors=new uint[16];
                 if(Native.GetConsoleScreenBufferInfoEx(output,ref palette)) {
@@ -417,12 +291,13 @@ namespace Worldex {
                 }
                 if(memory==null)throw new IOException("Director unavailable");
                 using(memory)using(var map=memory.CreateViewAccessor()) {
-                    map.Write(192+index*8,window.ToInt64());map.Write(128+index*8,DateTime.UtcNow.Ticks);map.Write(64+index*4,1);Rectangle area=Screen.PrimaryScreen.WorkingArea;string lastRect="";int oldScene=-1;bool shown=false;bool lifted=false;var report=Stopwatch.StartNew();
+                    map.Write(512+index*8,window.ToInt64());map.Write(256+index*8,DateTime.UtcNow.Ticks);map.Write(1024+index*4,Process.GetCurrentProcess().Id);map.Write(64+index*4,1);Rectangle area=Screen.PrimaryScreen.WorkingArea;string lastRect="",lastTitle="";int oldScene=-1;bool shown=false;bool lifted=false;var report=Stopwatch.StartNew();
                     while(map.ReadInt32(8)==0&&!File.Exists(Stop(s))) {
                         var timer=Stopwatch.StartNew();
-                        if((DateTime.UtcNow.Ticks-map.ReadInt64(24))/(double)TimeSpan.TicksPerSecond>5)break;
+                        if((DateTime.UtcNow.Ticks-map.ReadInt64(24))/(double)TimeSpan.TicksPerSecond>30)break;
                         double time=map.ReadDouble(0);bool paused=map.ReadInt32(12)!=0;int scene=visual.SceneAt(Math.Max(0,time));Box box=visual.Position(index,Math.Max(0,time));
-                        map.Write(128+index*8,DateTime.UtcNow.Ticks);
+                        string title=visual.FormationTitle(index,Math.Max(0,time));if(lastTitle!=title){Console.Title=title;lastTitle=title;}
+                        map.Write(256+index*8,DateTime.UtcNow.Ticks);
                         int x=area.X+(int)(box.x*area.Width),y=area.Y+(int)(box.y*area.Height),w=(int)(box.w*area.Width),h=(int)(box.h*area.Height);
                         string rect=x+","+y+","+w+","+h;
                         bool stageReady=map.ReadInt32(32)==1;
@@ -432,21 +307,16 @@ namespace Worldex {
                             Native.SetWindowPos(window,new IntPtr(-1),x,y,w,h,flags);lastRect=rect;oldScene=scene;
                             if(stageReady)lifted=true;
                         }
-                        if(!shown) {Native.ShowWindow(window,4);shown=true;}
-                        int cols=Math.Max(12,Math.Min(240,Console.WindowWidth)),rows=Math.Max(8,Math.Min(100,Console.WindowHeight));
-                        // Keep the buffer equal to the viewport: no stale scroll offsets
-                        // or legacy 9001-line scrollbars after animated window resizing.
-                        try {
-                            if(Console.WindowLeft!=0||Console.WindowTop!=0)Console.SetWindowPosition(0,0);
-                            if(Console.BufferWidth!=cols||Console.BufferHeight!=rows)Console.SetBufferSize(cols,rows);
-                        }catch(ArgumentOutOfRangeException) { }
+                        bool visible=visual.FormationVisible(index,Math.Max(0,time));
+                        if(shown!=visible) {Native.ShowWindow(window,visible?4:0);shown=visible;}
+                        int cols=Math.Max(12,Math.Min(240,Console.WindowWidth)),rows=Math.Max(4,Math.Min(100,Console.WindowHeight));
                         if(report.ElapsedMilliseconds>1000) {
                             var actualFont=new Native.FontInfo();actualFont.Size=(uint)Marshal.SizeOf(typeof(Native.FontInfo));Native.GetCurrentConsoleFontEx(output,false,ref actualFont);
                             File.WriteAllText(metadata,new JavaScriptSerializer().Serialize(new {PID=Process.GetCurrentProcess().Id,Handle=window.ToInt64(),Index=index,Columns=cols,Rows=rows,Dpi=dpi,Font=actualFont.Face,CellWidth=actualFont.Cell.X,CellHeight=actualFont.Cell.Y,ScreenWidth=area.Width,ScreenHeight=area.Height}));report.Restart();
                         }
                         Canvas canvas=visual.Draw(index,cols,rows,Math.Max(0,time),paused);
                         if(time<0)canvas.Center(rows/2,"CONNECTING TO AUDIO CLOCK",6);
-                        var region=new Native.Rect();region.R=(short)(cols-1);region.B=(short)(rows-1);
+                        var region=new Native.Rect();region.L=(short)Console.WindowLeft;region.T=(short)Console.WindowTop;region.R=(short)(region.L+cols-1);region.B=(short)(region.T+rows-1);
                         if(!Native.WriteConsoleOutputW(output,canvas.Cells,new Native.Coord(cols,rows),new Native.Coord(0,0),ref region))throw new IOException("Console frame write failed: "+Marshal.GetLastWin32Error());
                         while(Console.KeyAvailable) {
                             var key=Console.ReadKey(true).Key;
@@ -456,7 +326,7 @@ namespace Worldex {
                             if(key==ConsoleKey.RightArrow)map.Write(16,3);
                             if(key==ConsoleKey.Home)map.Write(16,4);
                         }
-                        Thread.Sleep(Math.Max(1,1000/visual.Theme.Number("fps")-(int)timer.ElapsedMilliseconds));
+                        Thread.Sleep(Math.Max(1,(paused?200:1000/visual.Theme.Number("fps"))-(int)timer.ElapsedMilliseconds));
                     }
                 }
             }catch(Exception ex) {File.WriteAllText(Path.Combine(s.Root,".runtime",s.Run+"-"+index+".log"),ex.ToString());}
@@ -464,18 +334,21 @@ namespace Worldex {
         }
         public static void Preview(string configPath,string directory) {
             var s=Visual.Load<Settings>(configPath);var v=new Visual(s);Directory.CreateDirectory(directory);
-            double[] moments={1,31,34.5,38.5,82,113,150,181,190};
+            double[] moments={2.95,19,32.8,34.1,40.1,60.5,67.25,83,113,117,150,160,181,199,206};
             foreach(double time in moments) {
                 using(var bitmap=new Bitmap(1646,981))using(var g=Graphics.FromImage(bitmap))using(var font=new Font(v.Theme.Font,10,FontStyle.Regular,GraphicsUnit.Pixel)) {
                     g.Clear(v.Palette[0]);g.TextRenderingHint=TextRenderingHint.SingleBitPerPixelGridFit;
-                    int[] order={0,1,2,3,4,5,6};foreach(int index in order) {
+                    int[] order={0,1,2,3,4,5,6,9,10,11,12,13,14,15,16,17,7,8};foreach(int index in order) {
+                        if(!v.FormationVisible(index,time))continue;
                         Box box=v.Position(index,time);int x=(int)(box.x*bitmap.Width),y=(int)(box.y*bitmap.Height),w=(int)(box.w*bitmap.Width),h=(int)(box.h*bitmap.Height);
                         using(var bg=new SolidBrush(Color.FromArgb(24,30,39)))g.FillRectangle(bg,x,y,w,22);
-                        g.DrawString("WORLDEX / "+index,font,Brushes.LightGray,x+8,y+5);
-                        int cols=Math.Max(12,(w-12)/7),rows=Math.Max(8,(h-30)/13);Canvas c=v.Draw(index,cols,rows,time,false);
+                        g.DrawString(v.FormationTitle(index,time),font,Brushes.LightGray,x+8,y+5);
+                        int cols=Math.Max(12,(w-12)/7),rows=Math.Max(4,(h-30)/13);Canvas c=v.Draw(index,cols,rows,time,false);
                         for(int row=0;row<rows;row++)for(int col=0;col<cols;col++) {
-                            Native.Cell cell=c.Cells[row*cols+col];if(cell.Char==' ')continue;
-                            using(var brush=new SolidBrush(v.Palette[cell.Attribute]))g.DrawString(cell.Char.ToString(),font,brush,x+5+col*7,y+25+row*13,StringFormat.GenericTypographic);
+                            Native.Cell cell=c.Cells[row*cols+col];int background=(cell.Attribute>>4)&15;
+                            if(background!=0)using(var brush=new SolidBrush(v.Palette[background]))g.FillRectangle(brush,x+5+col*7,y+25+row*13,7,13);
+                            if(cell.Char==' ')continue;
+                            using(var brush=new SolidBrush(v.Palette[cell.Attribute&15]))g.DrawString(cell.Char.ToString(),font,brush,x+5+col*7,y+25+row*13,StringFormat.GenericTypographic);
                         }
                     }
                     bitmap.Save(Path.Combine(directory,"stage-"+((int)time).ToString("000")+".png"));

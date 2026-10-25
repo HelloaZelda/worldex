@@ -1,31 +1,54 @@
-# Worldex / Terminal Ballet
+# Worldex / 窗口拼图 MV
 
-七个真实 Windows PowerShell / CMD 控制台随本地音乐共同演出。32 个语义场景，7 种窗口构图，Win32 帧缓冲目标 24 FPS，音频频谱与节拍驱动字符图形。四窗直接运行 PowerShell，三窗通过 CMD 承载同一渲染引擎。
+把真实 Windows 终端当作图块：16 个 PowerShell／CMD 控制台拼出心形、圆、波形、无穷符号、护盾、牢笼与数字，另有固定的歌词窗和节奏窗。其他段落切回中央字符动画与六个辅助终端，多余图块隐藏。窗口仅为语义切换而重排；鼓点驱动窗口内部的字符、亮度与信号。
 
-## 启动
+## 运行
 
-环境：Windows、Windows PowerShell 5.1、Python（`python -m pip install -r requirements.txt`）、PATH 中可用的 FFmpeg。
+Windows PowerShell 5.1、Python、FFmpeg。Python 依赖：`python -m pip install -r requirements.txt`。
 
-双击 `start.cmd`，默认读取桌面的 `world.execute (me) ; - Mili.flac`。也可指定音频：
+- 双击 `start.cmd`：从头播放本地歌曲。
+- 双击 `heart.cmd`：停在 01:07.25 的心形队形，空格继续。
+- 双击 `stop.cmd`：结束全部演出窗口与声音。
+
+默认查找桌面的 `world.execute (me) ; - Mili.flac`，之后记住最近使用的本地路径。
 
 ```powershell
 .\Start-Worldex.ps1 -AudioPath 'C:\Music\song.flac'
-.\Start-Worldex.ps1 -SeekSeconds 147 -PreviewSeconds 20
-.\Start-Worldex.ps1 -CueOffsetSeconds 0.2
+.\Start-Worldex.ps1 -SeekSeconds 67.25 -Paused
+.\Start-Worldex.ps1 -SeekSeconds 158 -PreviewSeconds 12
 .\Start-Worldex.ps1 -RenderOnly
 .\Stop-Worldex.ps1
 ```
 
-`-SeekSeconds` 从指定进度播放，`-PreviewSeconds` 限制本次演出时长；默认完整播放一遍。`-CueOffsetSeconds` 正数表示视觉场景提前，负数表示延后。`-Mute` 仅将本次播放静音。`-RenderOnly` 生成静态场景预览，不播放。
+点击终端后，空格暂停／继续，左右键跳转 10 秒，Home 回到开头。Esc 或全局 Ctrl+Shift+Q 退出。`-Paused` 等待空格后播放；`-Mute` 使用静音样本做预览；`-CueOffsetSeconds` 调整歌词与语义队形的整体偏移。演出置顶，结束后关闭全部自建窗口，不更改默认终端设置。
 
-点击任意演出终端后：空格暂停／继续，左右键跳转 10 秒，Home 从头开始，Esc 全部停止。全局快捷键 Ctrl+Shift+Q 或双击 `stop.cmd` 也能停止。演出期间舞台与七窗置顶，结束恢复；关闭任意一个演出窗口后，控制器会自动结束其余窗口与声音。控制器检测不到音频时钟心跳时，窗口自动退出。
+## 队形如何表达
 
-## 图形与同步
+| 歌词意象 | 窗口本身的动作 |
+|---|---|
+| 完整、快乐、相爱 | 16 窗拼成五排心形：2 / 5 / 5 / 3 / 1 |
+| 离开、孤立 | 心形逐块缺失，最后仅剩一个图块 |
+| 心碎 | 心形沿中间裂开，两半分离 |
+| 圆、周长 | 环形队列展开为一条线 |
+| 正弦、交流／直流 | 窗口拼成波形，再切换为水平直线 |
+| 无穷 | 窗口组成双环交叉的 ∞ 轮廓 |
+| 防护、被困 | 护盾外形与围住 ME / YOU 的窗框牢笼 |
+| 报数、身份 | 图块组成 1–6、F / M；固定字幕显示唱词 |
+| 学习、注意力 | 四层神经节点矩阵 |
+| 终止 | 图块组成 X |
 
-供电线路、旋转立方体、经纬球、点云、圆周、波形与切线意象、无穷曲线、倒转时钟、共振、植物、果实、猫、观察者之眼、记忆碎片、冲突大字、递归风暴、心形曲线与囚笼。中央展示语义主图，两侧以频谱、信号、几何和状态补充。
+程序同时保留密集字符图形：数据填充、立方体、三维点云、圆周展开、切线、星隧道、共振、具象蔬果与猫、心电图、记忆碎片、执行队列及神经网络。目标帧率 30 FPS；暂停时降低刷新率。
 
-音频先由 FFmpeg 解码为 PCM，Python 分析频谱通量、全曲周期性、节拍相位与 16 频带能量；七个窗口通过命名共享内存读取同一声卡播放位置。暂停与跳转同时作用于声音和画面。语义场景参考歌词时间戳，未经本录音逐字人工对齐；不是逐字卡拉 OK 字幕。
+## 歌词与节拍
 
-准备、分析、播放控制器与控制台均通过 WMI 独立启动，脱离启动终端的进程作业限制。播放前等待全部七窗就绪，结束自动关闭舞台。缓存、音频、日志与预览位于 Git 忽略的 `.runtime/`，不上传歌曲。分析依赖和源码来自本地，不调用云端模型。
+128 行英文歌词、132 个句级场景、395 个词语动作。逐句时间参考用户指定的 [world.execute-me-ascii](https://github.com/yym8224961/world.execute-me-ascii)，再以本地音频的中央声道频带起音做小范围修正。逐词高亮是音节权重与起音辅助估计，未经人工逐词确认。
 
-视觉规范见 `docs/art-direction.md`，主题在 `assets/design-tokens.json`，可编辑场景在 `assets/score.json`。当前时间表针对 Mili 原版约 212 秒录音，换曲需要重新编排。
+鼓、军鼓与高频起音从本地音频直接提取，视觉冲击读取实测时间，不使用恒定 BPM 正弦时钟。当前录音得到 1117 个瞬态事件；小节标尺包含实测拍点与缺失处的预测拍点。所有终端共享声卡播放位置，暂停、跳转同时影响声音、歌词和队形。
+
+首次会下载参考歌词 JSON；不上传音频。后续直接使用 `.runtime/` 缓存。歌曲、歌词缓存、模型实验缓存、解码音频、日志与图片均不提交 Git。当前编排针对约 212 秒的 Mili 原版录音。
+
+## 维护与验证
+
+`src/Worldex.Formations.cs` 定义窗口符号，`src/Worldex.Performance.cs` 绘制内容，`tools/build_performance.py` 编译歌词动作，`assets/design-tokens.json` 管理颜色字体。`.runtime/cache/<音频哈希>/` 包含可检查的歌词、节奏和生成时间线。
+
+启动后用 Windows PowerShell 5.1 运行 `tools/Verify-Worldex.ps1 -Live`，检查全部场景、歌词可见性、真实起音脉冲、心形几何、暂停与跳转。后台准备与所有终端由 WMI 独立启动，启动终端退出后继续运行。

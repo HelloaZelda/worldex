@@ -4,6 +4,7 @@ param(
     [double]$CueOffsetSeconds = 0,
     [int]$PreviewSeconds = 0,
     [switch]$Mute,
+    [switch]$Paused,
     [switch]$RenderOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -32,8 +33,9 @@ $cache = Join-Path $runtime ('cache\' + $audioHash)
 $settings = @{
     Run=$run; Root=$PSScriptRoot; Source=(Resolve-Path -LiteralPath $AudioPath).Path
     Cache=$cache; Audio=(Join-Path $cache 'music.wav'); Features=(Join-Path $cache 'features.bin')
-    Score=(Join-Path $PSScriptRoot 'assets\score.json'); Tokens=(Join-Path $PSScriptRoot 'assets\design-tokens.json')
-    Seek=$SeekSeconds; CueOffset=$CueOffsetSeconds; Preview=$PreviewSeconds; Mute=[bool]$Mute; RenderOnly=[bool]$RenderOnly
+    Score=(Join-Path $cache 'performance-score.json'); Tokens=(Join-Path $PSScriptRoot 'assets\design-tokens.json')
+    Lyrics=(Join-Path $cache 'lyrics-aligned.json'); Rhythm=(Join-Path $cache 'rhythm.json')
+    Seek=$SeekSeconds; CueOffset=$CueOffsetSeconds; Preview=$PreviewSeconds; Mute=[bool]$Mute; Paused=[bool]$Paused; RenderOnly=[bool]$RenderOnly
     Python=(Get-Command python).Source; Ffmpeg=(Get-Command ffmpeg).Source
 }
 $configPath = Join-Path $runtime ($run + '-config.json')

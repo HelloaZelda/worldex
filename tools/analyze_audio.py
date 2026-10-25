@@ -14,13 +14,14 @@ def analyze(source: Path, output: Path):
     output.mkdir(parents=True, exist_ok=True)
     fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()
     summary_path = output / 'audio-analysis.json'
-    if summary_path.exists():
-        saved = json.loads(summary_path.read_text(encoding='utf-8'))
-        if saved.get('version') == 2 and saved.get('sha256') == fingerprint and all((output / n).exists() for n in ('music.wav', 'features.bin')):
+    saved = json.loads(summary_path.read_text(encoding='utf-8')) if summary_path.exists() else {}
+    if saved:
+        if saved.get('version') == 3 and saved.get('sha256') == fingerprint and all((output / n).exists() for n in ('music.wav', 'features.bin', 'rhythm.json')):
             print(json.dumps(saved))
             return
-    subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(source),
-                    '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le', str(output / 'music.wav')], check=True)
+    if saved.get('sha256') != fingerprint or not (output/'music.wav').exists():
+        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(source),
+                        '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le', str(output / 'music.wav')], check=True)
     with wave.open(str(output / 'music.wav'), 'rb') as audio:
         stereo = np.frombuffer(audio.readframes(audio.getnframes()), dtype='<i2').reshape(-1, 2)
     mono = stereo.astype(np.float32).mean(axis=1)[::2] / 32768
@@ -39,14 +40,48 @@ def analyze(source: Path, output: Path):
     bpm = 60*sr/hop/refined
     # A full-track Fourier fit prevents the short-lag estimate drifting by beats.
     tempo_grid = np.arange(bpm-2, bpm+2, .002)
-    periodicity = [abs(np.dot(flux, np.exp(-2j*np.pi*(candidate/60)*times))) for candidate in tempo_grid]
+    periodicity = [abs(np.sum(flux * np.exp(-2j*np.pi*(candidate/60)*times))) for candidate in tempo_grid]
     bpm = float(tempo_grid[np.argmax(periodicity)])
     period = 60/bpm
     # Fit first beat phase to the measured onset envelope across the track.
     phases = np.arange(0, period, .002)
     scores = [np.interp(np.arange(p, len(mono)/sr, period), times, flux).sum() for p in phases]
     phase = float(phases[np.argmax(scores)])
-    fps = 30
+    # Pick actual percussive events, then refine each against a 1ms waveform envelope.
+    envelopes=[]
+    for low,high in [(35,250),(250,2400),(2400,10000)]:
+        spec=np.log1p(magnitude[(frequencies>=low)&(frequencies<high)]*200)
+        env=np.r_[0,np.maximum(0,np.diff(spec,axis=1)).mean(axis=0)]
+        env=np.maximum(0,env-signal.medfilt(env,31))
+        envelopes.append(np.clip(env/max(float(np.percentile(env,98)),1e-7),0,2))
+    combined=envelopes[0]*.50+envelopes[1]*.33+envelopes[2]*.17
+    peaks,_=signal.find_peaks(combined,distance=int(.095*sr/hop),prominence=.13,height=.16)
+    rms=np.sqrt(np.mean(mono[:len(mono)//22*22].reshape(-1,22)**2,axis=1)+1e-10)
+    attack=np.maximum(0,np.diff(signal.savgol_filter(rms,7,2),prepend=rms[0]))
+    event_times=[];event_strength=[];event_types=[]
+    for peak in peaks:
+        center=times[peak]
+        a=max(0,int((center-.045)*1000));b=min(len(attack),int((center+.045)*1000))
+        refined_time=(a+int(np.argmax(attack[a:b])))*22/sr if b>a else center
+        event_times.append(float(refined_time));event_strength.append(float(min(1,combined[peak])))
+        event_types.append(int(np.argmax([e[peak] for e in envelopes])))
+    events=sorted(zip(event_times,event_strength,event_types))
+    # Phase-lock to locally observed attacks, allowing a varying interval. Missing
+    # evidence is marked as predicted instead of presenting a perfect fake grid.
+    beats=[]
+    for predicted in np.arange(phase,len(mono)/sr,period):
+        nearby=[(t,s,k) for t,s,k in events if abs(t-predicted)<period*.16]
+        if nearby:
+            t,s,k=max(nearby,key=lambda e:e[1]*np.exp(-((e[0]-predicted)/.05)**2))
+            beats.append(dict(time=round(t,4),strength=round(s,3),predicted=False))
+        else:beats.append(dict(time=round(float(predicted),4),strength=0.0,predicted=True))
+    beats.sort(key=lambda b:b['time'])
+    meter_scores=[sum(b['strength'] for i,b in enumerate(beats) if i%4==slot) for slot in range(4)]
+    downbeat_slot=int(np.argmax(meter_scores))
+    for i,b in enumerate(beats):b.update(index=i,slot=(i-downbeat_slot)%4)
+    rhythm=dict(version=3,beats=beats,events=[dict(time=round(t,4),strength=round(s,3),kind=['kick','snare','hat'][k]) for t,s,k in events])
+    (output/'rhythm.json').write_text(json.dumps(rhythm,separators=(',',':')),encoding='utf-8')
+    fps = 60
     frame_times = np.arange(0, len(mono)/sr, 1/fps)
     edges = np.geomspace(40, 10500, 17)
     bands = []
@@ -57,15 +92,25 @@ def analyze(source: Path, output: Path):
         bands.append(np.interp(frame_times, times, np.clip(values, 0, 1)))
     bands = np.array(bands).T
     onset = np.clip(flux/max(float(np.percentile(flux, 97)), 1e-6), 0, 1)
+    def impulses(items,decay):
+        field=np.zeros(len(frame_times))
+        for t,strength in items:
+            delta=frame_times-t
+            field=np.maximum(field,np.where((delta>=0)&(delta<decay*6),strength*np.exp(-np.maximum(delta,0)/decay),0))
+        return field
+    attacks=[impulses([(t,s) for t,s,k in events if k==band],.09 if band<2 else .055) for band in range(3)]
+    beat_pulse=impulses([(b['time'],.35+.65*b['strength']) for b in beats],.11)
+    bar_pulse=impulses([(b['time'],.5+.5*b['strength']) for b in beats if b['slot']==0],.18)
     features = np.column_stack([bands[:,:5].mean(axis=1), bands[:,5:11].mean(axis=1), bands[:,11:].mean(axis=1),
-                                np.interp(frame_times, times, onset), bands]).astype('<f4')
+                                np.interp(frame_times, times, onset), bands,*attacks,beat_pulse,bar_pulse]).astype('<f4')
     with (output / 'features.bin').open('wb') as file:
         file.write(np.array([fps, len(features), features.shape[1]], dtype='<i4').tobytes())
         file.write(features.tobytes())
-    summary = dict(version=2, sha256=fingerprint, duration=len(mono)/sr, bpm=round(bpm, 3), beatOffset=phase,
+    summary = dict(version=3, sha256=fingerprint, duration=len(mono)/sr, bpm=round(bpm, 3), beatOffset=phase,
                    featureFps=fps, featureFrames=len(features), sampleRate=44100,
-                   method='spectral flux autocorrelation + global beat phase fit',
-                   note='Beat grid is audio-derived; semantic scene cues are editorial, not forced lyric alignment.')
+                   method='three-band percussive attacks + 1ms waveform refinement + locally observed beat map',
+                   events=len(events),observedBeats=sum(not b['predicted'] for b in beats),predictedBeats=sum(b['predicted'] for b in beats),
+                   note='Animation pulses use measured transient times, not a constant BPM oscillator.')
     summary_path.write_text(json.dumps(summary, indent=2), encoding='utf-8')
     print(json.dumps(summary))
 
