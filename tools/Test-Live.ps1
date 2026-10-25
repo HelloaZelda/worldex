@@ -20,7 +20,7 @@ function Set-Time([double]$seconds) {
 }
 try {
     Save-Result 'starting' $null
-    & (Join-Path $root 'Start-Worldex.ps1') -SeekSeconds 67.25 -Paused -Mute | Out-File $log -Encoding UTF8
+    & (Join-Path $root 'Start-Worldex.ps1') -SeekSeconds 67.25 -Paused -Mute -NoWait | Out-File $log -Encoding UTF8
     $run=Get-Content -LiteralPath (Join-Path $root '.runtime\run.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $clock=Join-Path $root ('.runtime\'+$run.Run+'-playback.json')
     for($attempt=0;$attempt -lt 120;$attempt++) {

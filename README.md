@@ -12,6 +12,8 @@ Windows PowerShell 5.1、Python、FFmpeg。Python 依赖：`python -m pip instal
 
 默认查找桌面的 `world.execute (me) ; - Mili.flac`，之后记住最近使用的本地路径。
 
+双击后会显示启动进度，创建 18 个终端需要一段时间；确认画面与音频时钟就绪后，启动窗口才关闭。失败时保留错误信息。已验证的 Python 与 FFmpeg 路径保存在本地偏好中，支持从资源管理器直接启动。
+
 ```powershell
 .\Start-Worldex.ps1 -AudioPath 'C:\Music\song.flac'
 .\Start-Worldex.ps1 -SeekSeconds 67.25 -Paused

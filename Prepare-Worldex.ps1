@@ -66,7 +66,7 @@ try {
         $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=$command;CurrentDirectory=$settings.Root;ProcessStartupInformation=$panelStartup}
         if ($result.ReturnValue -ne 0) { throw ('Unable to create panel ' + $index) }
     }
-    Set-Stage 'playing'
+    Set-Stage 'waiting-for-terminals'
     [Worldex.Engine]::Director($Config)
     if (Test-Path -LiteralPath (Join-Path $runtime ($settings.Run + '-director.log'))) { throw 'Director failed; see director log.' }
     Set-Stage 'finished'
