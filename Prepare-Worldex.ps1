@@ -14,7 +14,7 @@ try {
     $lyricReady = $false
     if (Test-Path -LiteralPath $settings.Lyrics) {
         $existing = Get-Content -LiteralPath $settings.Lyrics -Raw -Encoding UTF8 | ConvertFrom-Json
-        $lyricReady = $existing.version -eq 3
+        $lyricReady = $existing.version -eq 4 -and @($existing.lines | Where-Object { -not $_.translation }).Count -eq 0
     }
     if (-not $lyricReady) {
         & $settings.Python (Join-Path $settings.Root 'tools\align_lyrics.py') --cache $settings.Cache 2>&1 | Out-File -LiteralPath (Join-Path $runtime ($settings.Run + '-lyrics.log')) -Encoding UTF8

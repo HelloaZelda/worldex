@@ -58,9 +58,12 @@ def align(cache):
             a=start if j==0 else snap(predicted,min(.09,duration/len(words)*.22))
             aligned.append(dict(text=word,start=round(a,3),end=0,confidence=None))
         for j,word in enumerate(aligned):word['end']=aligned[j+1]['start'] if j+1<len(aligned) else round(end,3)
-        lines.append(dict(start=round(start,3),end=round(end,3),reference=item['time'],text=item['en'],words=aligned,
+        translation=item.get('zh','').strip()
+        if not translation or '\ufffd' in translation:
+            raise ValueError('Missing or invalid Chinese translation in reference cue')
+        lines.append(dict(start=round(start,3),end=round(end,3),reference=item['time'],text=item['en'],translation=translation,words=aligned,
                           method='reference line cue + local vocal-band attack correction; estimated word sweep'))
-    payload=dict(version=3,source='user-provided local audio',reference=REFERENCE,
+    payload=dict(version=4,languages=['en','zh-Hans'],source='user-provided local audio',reference=REFERENCE,
                  accuracy='Line timing refined within 75ms of reference. Word times are onset-assisted estimates, not phonetic forced alignment.',lines=lines)
     (cache/'lyrics-aligned.json').write_text(json.dumps(payload,indent=2),encoding='utf-8')
     print(json.dumps(dict(lines=len(lines),words=sum(len(l['words']) for l in lines),method=payload['accuracy'])))

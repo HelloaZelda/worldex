@@ -146,8 +146,15 @@ namespace Worldex {
         public Canvas(int w,int h) { W=w;H=h;Cells=new Native.Cell[w*h];Clear(); }
         public void Clear() { for(int i=0;i<Cells.Length;i++){Cells[i].Char=' ';Cells[i].Attribute=1;} }
         public void Put(int x,int y,char c,int color) { if(x>=0&&y>=0&&x<W&&y<H) { Cells[y*W+x].Char=c;Cells[y*W+x].Attribute=(ushort)color; } }
-        public void Text(int x,int y,string text,int color) { for(int i=0;i<text.Length;i++)Put(x+i,y,text[i],color); }
-        public void Center(int y,string text,int color) { Text((W-text.Length)/2,y,text,color); }
+        public static bool Wide(char ch) {return (ch>='\u2e80'&&ch<='\ua4cf')||(ch>='\uac00'&&ch<='\ud7af')||(ch>='\uf900'&&ch<='\ufaff')||(ch>='\ufe10'&&ch<='\ufe6f')||(ch>='\uff01'&&ch<='\uff60')||(ch>='\uffe0'&&ch<='\uffe6');}
+        public static int TextWidth(string text) {int width=0;foreach(char ch in text)width+=Wide(ch)?2:1;return width;}
+        public void Text(int x,int y,string text,int color) {
+            foreach(char ch in text) {
+                if(Wide(ch)) {if(x>=0&&x+1<W){Put(x,y,ch,color|0x100);Put(x+1,y,ch,color|0x200);}x+=2;}
+                else {Put(x,y,ch,color);x++;}
+            }
+        }
+        public void Center(int y,string text,int color) { Text((W-TextWidth(text))/2,y,text,color); }
         public void Line(double x0,double y0,double x1,double y1,char c,int color) {
             int n=(int)Math.Max(Math.Abs(x1-x0),Math.Abs(y1-y0))+1;
             for(int i=0;i<=n;i++){double t=(double)i/n;Put((int)Math.Round(x0+(x1-x0)*t),(int)Math.Round(y0+(y1-y0)*t),c,color);}
@@ -276,7 +283,7 @@ namespace Worldex {
                 uint mode;IntPtr input=Native.GetStdHandle(-10);if(Native.GetConsoleMode(input,out mode))Native.SetConsoleMode(input,(mode|0x80u)&~0x40u);
                 double dpi=Native.GetDpiForWindow(window)/96.0;
                 // Console font coordinates are logical; conhost applies monitor DPI.
-                var font=new Native.FontInfo();font.Size=(uint)Marshal.SizeOf(typeof(Native.FontInfo));font.Cell=new Native.Coord(0,index==7?19:11);font.Face=visual.Theme.Font;font.Weight=400;font.Family=54;
+                var font=new Native.FontInfo();font.Size=(uint)Marshal.SizeOf(typeof(Native.FontInfo));font.Cell=new Native.Coord(0,index==7?19:11);font.Face=index==7?"新宋体":visual.Theme.Font;font.Weight=400;font.Family=54;
                 if(!Native.SetCurrentConsoleFontEx(output,false,ref font))throw new IOException("Unable to set console font");
                 var palette=new Native.BufferInfo();palette.Size=(uint)Marshal.SizeOf(typeof(Native.BufferInfo));palette.Colors=new uint[16];
                 if(Native.GetConsoleScreenBufferInfoEx(output,ref palette)) {
@@ -347,7 +354,7 @@ namespace Worldex {
                         for(int row=0;row<rows;row++)for(int col=0;col<cols;col++) {
                             Native.Cell cell=c.Cells[row*cols+col];int background=(cell.Attribute>>4)&15;
                             if(background!=0)using(var brush=new SolidBrush(v.Palette[background]))g.FillRectangle(brush,x+5+col*7,y+25+row*13,7,13);
-                            if(cell.Char==' ')continue;
+                            if(cell.Char==' '||(cell.Attribute&0x200)!=0)continue;
                             using(var brush=new SolidBrush(v.Palette[cell.Attribute&15]))g.DrawString(cell.Char.ToString(),font,brush,x+5+col*7,y+25+row*13,StringFormat.GenericTypographic);
                         }
                     }

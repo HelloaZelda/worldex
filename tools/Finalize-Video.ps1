@@ -17,8 +17,9 @@ try {
     & (Join-Path $PSScriptRoot 'Validate-Video.ps1') -JobPath $Job -Decode | Out-File (Join-Path $settings.Directory 'validation-output.log') -Encoding UTF8
     $desktop=[Environment]::GetFolderPath('Desktop')
     if(-not(Test-Path $desktop)){New-Item -ItemType Directory -Path $desktop -Force|Out-Null}
-    $copy=Join-Path $desktop 'world.execute-me-4k.mp4'
-    if(Test-Path $copy){$copy=Join-Path $desktop ('world.execute-me-4k-'+[DateTime]::Now.ToString('yyyyMMdd-HHmmss')+'.mp4')}
+    $filename=[IO.Path]::GetFileName($settings.Output)
+    $copy=Join-Path $desktop $filename
+    if(Test-Path $copy){$copy=Join-Path $desktop ([IO.Path]::GetFileNameWithoutExtension($filename)+'-'+[DateTime]::Now.ToString('yyyyMMdd-HHmmss')+[IO.Path]::GetExtension($filename))}
     Copy-Item -LiteralPath $settings.Output -Destination $copy
     @{stage='complete';output=$settings.Output;desktop=$copy;bytes=(Get-Item $settings.Output).Length;validation=(Join-Path $settings.Directory 'validation.json')}|ConvertTo-Json|Set-Content $report -Encoding UTF8
 }catch {

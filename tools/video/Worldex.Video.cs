@@ -22,7 +22,7 @@ namespace Worldex.Video {
         readonly Visual visual;readonly Job job;readonly Settings settings;
         readonly Bitmap bitmap;readonly Graphics graphics;
         readonly Color[] colors;readonly SolidBrush[] brushes;
-        readonly Font normal,tile,caption,small,header,title;
+        readonly Font normal,tile,caption,captionChinese,small,header,title;
         readonly StringFormat format;
         readonly int[] order={0,1,2,3,4,5,6,9,10,11,12,13,14,15,16,17,7,8};
         class RasterGlyph {public int Width,Height;public int[] Pixels;}
@@ -44,6 +44,7 @@ namespace Worldex.Video {
             normal=new Font("Consolas",14*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             tile=new Font("Consolas",12*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             caption=new Font("Consolas",24*scale,FontStyle.Regular,GraphicsUnit.Pixel);
+            captionChinese=new Font("Microsoft YaHei",20*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             small=new Font("Consolas",10*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             header=new Font("Consolas",11*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             title=new Font("Consolas",21*scale,FontStyle.Regular,GraphicsUnit.Pixel);
@@ -58,7 +59,7 @@ namespace Worldex.Video {
         static void ClearRow(Canvas canvas,int y) {for(int x=0;x<canvas.W;x++){canvas.Cells[y*canvas.W+x].Char=' ';canvas.Cells[y*canvas.W+x].Attribute=1;}}
         void Glyph(char ch,int color,Font font,int cw,int lineHeight,int x,int y) {
             if(ch==' ')return;
-            int fontId=Object.ReferenceEquals(font,normal)?1:Object.ReferenceEquals(font,tile)?2:Object.ReferenceEquals(font,caption)?3:4;
+            int fontId=Object.ReferenceEquals(font,normal)?1:Object.ReferenceEquals(font,tile)?2:Object.ReferenceEquals(font,caption)?3:Object.ReferenceEquals(font,captionChinese)?5:4;
             int key=(fontId<<24)|(color<<16)|(int)ch;
             RasterGlyph glyph;
             if(!glyphs.TryGetValue(key,out glyph)) {
@@ -108,7 +109,9 @@ namespace Worldex.Video {
                     run=finish;
                 }
                 for(int col=0;col<canvas.W;col++) {
-                    var cell=canvas.Cells[row*canvas.W+col];Glyph(cell.Char,cell.Attribute&15,font,cw,lineHeight,left+col*cw,top+row*lineHeight);
+                    var cell=canvas.Cells[row*canvas.W+col];if((cell.Attribute&0x200)!=0)continue;
+                    bool wide=(cell.Attribute&0x100)!=0;
+                    Glyph(cell.Char,cell.Attribute&15,wide?captionChinese:font,wide?cw*2:cw,lineHeight,left+col*cw,top+row*lineHeight);
                 }
             }
         }
@@ -210,7 +213,7 @@ namespace Worldex.Video {
         }
         public void Dispose() {
             foreach(var brush in brushes)brush.Dispose();
-            normal.Dispose();tile.Dispose();caption.Dispose();small.Dispose();header.Dispose();title.Dispose();format.Dispose();graphics.Dispose();bitmap.Dispose();
+            normal.Dispose();tile.Dispose();caption.Dispose();captionChinese.Dispose();small.Dispose();header.Dispose();title.Dispose();format.Dispose();graphics.Dispose();bitmap.Dispose();
         }
     }
 }

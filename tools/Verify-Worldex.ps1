@@ -36,6 +36,17 @@ foreach($line in $visual.Lyrics.lines) {
     $visible=(-join ($caption.Cells|ForEach-Object {$_.Char})) -replace '\s',''
     $expected=$line.text -replace '\s',''
     if(-not $visible.Contains($expected)){throw ('Lyric missing from caption window at '+$line.start)}
+    if(-not $line.translation){throw ('Chinese translation missing at '+$line.start)}
+    foreach($size in @(@(120,12),@(77,6),@(24,10))) {
+        $bilingual=$visual.Draw(7,$size[0],$size[1],$moment,$false)
+        $text=(-join ($bilingual.Cells | Where-Object {($_.Attribute -band 512) -eq 0} | ForEach-Object {$_.Char})) -replace '\s',''
+        if(-not $text.Contains(($line.translation -replace '\s',''))){throw ('Chinese caption clipped at '+$line.start+' / '+($size -join 'x'))}
+        if(-not $text.Contains($expected)){throw ('English caption clipped at '+$line.start+' / '+($size -join 'x'))}
+        for($cell=0;$cell -lt $bilingual.Cells.Length;$cell++) {
+            if(($bilingual.Cells[$cell].Attribute -band 256) -eq 0){continue}
+            if($cell%$size[0] -eq $size[0]-1 -or ($bilingual.Cells[$cell+1].Attribute -band 512) -eq 0){throw 'Broken Chinese double-width cell pair.'}
+        }
+    }
     $captionChecks++
 }
 $impacts=0
@@ -47,7 +58,7 @@ foreach($event in $visual.Rhythm.events) {
     if($after-$before -gt .25){$impacts++}
 }
 if($impacts -lt 20){throw 'Audio impacts are not arriving at their measured timestamps.'}
-Write-Host ('PASS: '+$captionChecks+' complete sung lines visible; '+$impacts+' measured attacks produce correctly timed pulse rises.')
+Write-Host ('PASS: '+$captionChecks+' bilingual lines visible at three caption sizes; '+$impacts+' measured attacks produce correctly timed pulse rises.')
 $graphicActors=@(0,1,2,3,4,5,6,9,10,11,12,13,14,15,16,17)
 $poses=@()
 foreach($index in $graphicActors) {

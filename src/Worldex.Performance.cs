@@ -4,7 +4,7 @@ namespace Worldex {
     using System.Collections.Generic;
 
     public class SungWord { public string text;public double start,end; }
-    public class SungLine { public string text,method;public double start,end;public SungWord[] words; }
+    public class SungLine { public string text,translation,method;public double start,end;public SungWord[] words; }
     public class LyricTrack { public SungLine[] lines; }
     public class RhythmBeat { public double time,strength;public int index,slot;public bool predicted; }
     public class RhythmEvent { public double time,strength;public string kind; }
@@ -34,11 +34,16 @@ namespace Worldex {
             c.Line(1,1,c.W-2,1,'─',color);c.Line(1,c.H-2,c.W-2,c.H-2,'─',color);
             c.Line(1,1,1,c.H-2,'│',color);c.Line(c.W-2,1,c.W-2,c.H-2,'│',color);
         }
+        static List<string> CaptionRows(string text,int width) {
+            var rows=new List<string>();string row="";int used=0;
+            foreach(char ch in text??"") {int size=Canvas.Wide(ch)?2:1;if(used+size>width&&row.Length>0){rows.Add(row);row="";used=0;}row+=ch;used+=size;}
+            if(row.Length>0)rows.Add(row);return rows;
+        }
         Canvas DrawLyrics(int width,int height,double time,bool paused) {
             var c=new Canvas(width,height);int n=LineAt(time+Config.CueOffset);var line=Lyrics.lines[n];
             bool keyword=line.text.Length>1&&line.text==line.text.ToUpper();
             bool active=time+Config.CueOffset>=line.start-.08&&time+Config.CueOffset<=line.end+(keyword?1.15:.25);
-            c.Text(1,0,"LYRICS / "+TimeSpan.FromSeconds(time).ToString(@"mm\:ss\.ff")+(paused?" / PAUSED":""),3);
+            c.Text(1,0,"EN / 中文 / "+TimeSpan.FromSeconds(time).ToString(@"mm\:ss\.ff")+(paused?" / PAUSED":""),3);
             if(height>5)for(int previous=n;previous>=Math.Max(0,n-6);previous--) {
                 var emphasis=Lyrics.lines[previous];double local=time+Config.CueOffset;
                 if(emphasis.text.Length>1&&emphasis.text==emphasis.text.ToUpper()&&local>=emphasis.start&&local<=emphasis.end+1.5&&local-emphasis.start<3.5) {
@@ -49,21 +54,26 @@ namespace Worldex {
             if(!active) {
                 var interlude=Scenes[SceneAt(time)];
                 string message=interlude.kind=="stall"?"[ FINALIZING / 99% / WAITING FOR RETURN ]":interlude.kind=="storm"?"[ RECURSION / STACK OVERFLOW ]":"[ INSTRUMENTAL / WINDOW CHOREOGRAPHY ]";
-                c.Center(Math.Max(1,height/2),message,interlude.kind=="stall"?4:1);return c;
+                c.Center(Math.Max(1,height/2-1),message,interlude.kind=="stall"?4:1);
+                string translated=interlude.kind=="stall"?"正在完成 / 99% / 等待返回":interlude.kind=="storm"?"递归 / 堆栈溢出":"间奏 / 窗口编排";
+                c.Center(Math.Min(height-2,height/2+1),translated,3);return c;
             }
             var rows=new List<List<SungWord>>();var current=new List<SungWord>();int length=0;
             foreach(var word in line.words){if(length+word.text.Length+1>width-4&&current.Count>0){rows.Add(current);current=new List<SungWord>();length=0;}current.Add(word);length+=word.text.Length+1;}
             if(current.Count>0)rows.Add(current);
-            int y=Math.Max(1,(height-rows.Count)/2);
+            var translatedRows=CaptionRows(line.translation,width-4);
+            int block=rows.Count+1+translatedRows.Count;
+            int y=Math.Max(height>5?2:1,(height-1-block)/2);
             foreach(var row in rows) {
                 int total=0;foreach(var w in row)total+=w.text.Length+1;int x=(width-total)/2;
                 foreach(var w in row) {
                     double local=time+Config.CueOffset;int color=local>=w.end?2:local>=w.start?6:1;
                     c.Text(x,y,w.text,color);
-                    if(local>=w.start&&local<w.end&&y+1<height-1){int len=(int)(w.text.Length*Math.Min(1,(local-w.start)/Math.Max(.05,w.end-w.start)));c.Text(x,y+1,new string('━',Math.Max(1,len)),2);}
+                    if(Object.ReferenceEquals(row,rows[rows.Count-1])&&local>=w.start&&local<w.end&&y+1<height-1){int len=(int)(w.text.Length*Math.Min(1,(local-w.start)/Math.Max(.05,w.end-w.start)));c.Text(x,y+1,new string('━',Math.Max(1,len)),2);}
                     x+=w.text.Length+1;
                 }y++;
             }
+            y++;foreach(string translated in translatedRows)c.Center(y++,translated,3);
             int fill=(int)((width-2)*Math.Max(0,Math.Min(1,(time+Config.CueOffset-line.start)/Math.Max(.1,line.end-line.start))));
             c.Text(1,height-1,new string('━',fill),2);return c;
         }
