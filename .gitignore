@@ -13,3 +13,5 @@ build/
 *.dll
 *.pdb
 .runtime/
+exports/
+*.mp4

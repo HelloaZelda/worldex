@@ -59,3 +59,16 @@ Windows PowerShell 5.1、Python、FFmpeg。Python 依赖：`python -m pip instal
 `src/Worldex.Formations.cs` 定义窗口符号，`src/Worldex.Performance.cs` 绘制内容，`tools/build_performance.py` 编译歌词动作，`assets/design-tokens.json` 管理颜色字体。`.runtime/cache/<音频哈希>/` 包含可检查的歌词、节奏和生成时间线。
 
 启动后用 Windows PowerShell 5.1 运行 `tools/Verify-Worldex.ps1 -Live`，检查全部场景、歌词可见性、真实起音脉冲、心形几何、暂停与跳转。后台准备与所有终端由 WMI 独立启动，启动终端退出后继续运行。
+
+## 导出视频
+
+```powershell
+.\Export-Video.ps1
+.\tools\Video-Progress.ps1
+```
+
+默认生成 `exports/world.execute-me-4k.mp4`：3840×2160、30 FPS、H.264 + AAC，适合直接分享。窗口以统一的精简标题栏、细边框、抗锯齿等宽字体离线绘制，不录入桌面其他内容。音乐与视觉使用同一音频时间坐标。
+
+渲染通过 WMI 脱离启动终端运行，默认四段并行；仅合并视频流，整首音轨在最终封装时一次性编码，避免分段音频缝隙。优先使用 NVIDIA 编码器，无法使用时改用软件编码。进度、错误日志和中间文件位于 `.runtime/video/`，输出视频不提交 Git。
+
+可指定 `-Width 1920 -Height 1080`、`-Start 36.9 -Length 3`、`-Parallelism 2`、`-OutputPath 'C:\Videos\mv.mp4'`。`-Stills` 只导出设计检查帧。取消时在当前视频任务目录创建名为 `cancel` 的空文件。
