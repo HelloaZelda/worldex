@@ -50,7 +50,7 @@ namespace Worldex {
                 if(kind=="completion")for(int i=0;i<16;i++)if(cueTime-scene.time<i*.025)f.Visible[i]=false;
                 if(kind=="broken") {
                     double amount=Math.Min(1,Math.Max(0,(cueTime-scene.time)/.7));
-                    for(int i=0;i<16;i++){var b=f.Boxes[i];b.x+=(b.x<.47?-.06:.06)*amount;f.Boxes[i]=b;}
+                    for(int i=0;i<16;i++){var b=f.Boxes[i];b.x+=(b.x<.47?-.06:.06)*amount;b.y+=amount*.035*(i%3);f.Boxes[i]=b;}
                 }
                 if(kind=="release") {
                     double amount=Math.Min(1,Math.Max(0,cueTime-scene.time));var b=f.Boxes[1];b.x+=amount*.20;b.y-=amount*.07;f.Boxes[1]=b;
